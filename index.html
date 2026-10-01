@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<title>Ma journée disciplinée</title>
+<style>
+:root{--bg:#f6f3ec;--card:#fff;--ink:#1d2b27;--mute:#66736f;--green:#1f6f5c;--gold:#c99a2e;--line:#d9e3df;--ok:#e3f1ec;
+box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#121a18;--card:#1b2724;--ink:#e8efec;--mute:#93a39e;--green:#5bbfa4;--gold:#e0b550;--line:#2c3b37;--ok:#21362f}}
+:root[data-theme="dark"]{--bg:#121a18;--card:#1b2724;--ink:#e8efec;--mute:#93a39e;--green:#5bbfa4;--gold:#e0b550;--line:#2c3b37;--ok:#21362f}
+html{scroll-padding-top:env(safe-area-inset-top,0px)}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.4 -apple-system,system-ui,"Segoe UI",sans-serif}
+main{max-width:480px;margin:0 auto;padding:18px 16px 40px}
+h1{font:700 24px/1.2 Georgia,"Times New Roman",serif;color:var(--green);margin:0 0 2px}
+.sub{color:var(--mute);font-size:14px;margin:0 0 16px}
+.week{display:grid;grid-template-columns:repeat(7,1fr);gap:6px;margin-bottom:14px}
+.day{border:1px solid var(--line);background:var(--card);border-radius:10px;padding:7px 0;text-align:center;color:var(--ink);font:inherit;font-size:12px;cursor:pointer}
+.day b{display:block;font-size:16px}
+.day.sel{border-color:var(--green);box-shadow:0 0 0 2px var(--green)}
+.day.done{background:var(--ok)}
+.day:focus-visible,.item:focus-visible{outline:3px solid var(--gold);outline-offset:2px}
+.score{display:flex;justify-content:space-between;align-items:baseline;margin:6px 2px 8px}
+.score strong{font-size:18px}
+.bar{height:8px;background:var(--line);border-radius:6px;overflow:hidden;margin-bottom:14px}
+.bar i{display:block;height:100%;background:var(--green);width:0;transition:width .25s}
+.item{display:flex;gap:12px;align-items:center;width:100%;text-align:left;background:var(--card);border:1px solid var(--line);border-radius:12px;padding:13px 14px;margin-bottom:8px;color:var(--ink);font:inherit;cursor:pointer}
+.box{flex:none;width:24px;height:24px;border:2px solid var(--green);border-radius:7px;display:grid;place-items:center;color:#fff;font-size:15px}
+.item.on{background:var(--ok)}
+.item.on .box{background:var(--green)}
+.item.on span:last-child{text-decoration:line-through;color:var(--mute)}
+h2{font:700 16px/1.2 Georgia,serif;color:var(--gold);margin:18px 2px 8px}
+.note{color:var(--mute);font-size:13px;margin-top:20px;border-top:1px solid var(--line);padding-top:12px}
+@media (prefers-reduced-motion:reduce){.bar i{transition:none}}
+</style>
+</head>
+<body>
+<main>
+<h1>Ma journée disciplinée</h1>
+<p class="sub" id="date"></p>
+<div class="week" id="week"></div>
+<div class="score"><strong id="count"></strong><span id="wk" class="sub" style="margin:0"></span></div>
+<div class="bar"><i id="fill"></i></div>
+<div id="list"></div>
+<p class="note">Un bloc raté ? On reprend au suivant, sans culpabilité. Objectif réaliste : 5 jours sur 7.<br><br>
+Pour l'installer sur l'iPhone : ouvrir ce lien dans Safari, appuyer sur Partager, puis « Sur l'écran d'accueil ».</p>
+</main>
+<script>
+var BASE=[["wake","Réveil à 4h"],["fajr","Fajr + invocations du matin"],["sport","Sport (1h)"],["eng","Anglais (30 à 45 min)"],["fam","Dîner en famille, sans téléphone"],["rech","Recherche médicale"],["soc","Réseaux sociaux : limite respectée"],["bed","Coucher vers 21h30"]];
+var FRI=[["gh","Grande ablution (ghusl)"],["kahf","Al-Kahf : 10 versets + écoute"],["sal","Prières sur le Prophète toute la journée"],["jum","Jumu'a, partie tôt"],["dua","Invocations après Asr jusqu'à Maghrib"]];
+var KEY="jd-suivi-v1",D=["Lun","Mar","Mer","Jeu","Ven","Sam","Dim"];
+var data={};
+try{data=JSON.parse(localStorage.getItem(KEY)||"{}")}catch(e){data={}}
+function save(){try{localStorage.setItem(KEY,JSON.stringify(data))}catch(e){}}
+function k(d){return d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")+"-"+String(d.getDate()).padStart(2,"0")}
+function items(d){return d.getDay()===5?BASE.concat(FRI):BASE}
+function done(d){return (data[k(d)]||[]).length}
+function ok(d){var n=items(d).length;return done(d)>=Math.ceil(n*0.8)}
+var today=new Date(),sel=new Date(today);
+function monday(d){var m=new Date(d);m.setDate(m.getDate()-((m.getDay()+6)%7));return m}
+function render(){
+ var m=monday(today),w=document.getElementById("week");w.innerHTML="";var tenus=0;
+ for(var i=0;i<7;i++){var d=new Date(m);d.setDate(m.getDate()+i);if(ok(d))tenus++;
+  var b=document.createElement("button");b.className="day"+(k(d)===k(sel)?" sel":"")+(ok(d)?" done":"");
+  b.innerHTML=D[i]+"<b>"+d.getDate()+"</b>";b.setAttribute("aria-label",D[i]+" "+d.getDate());
+  (function(dd){b.onclick=function(){sel=dd;render()}})(d);w.appendChild(b)}
+ document.getElementById("date").textContent=sel.toLocaleDateString("fr-FR",{weekday:"long",day:"numeric",month:"long"})+(sel.getDay()===5?" : le jour béni":"");
+ var list=document.getElementById("list");list.innerHTML="";var its=items(sel),got=data[k(sel)]||[];
+ function add(arr){arr.forEach(function(it){var on=got.indexOf(it[0])>-1;
+  var b=document.createElement("button");b.className="item"+(on?" on":"");b.setAttribute("aria-pressed",on);
+  b.innerHTML='<span class="box">'+(on?"✓":"")+'</span><span>'+it[1]+'</span>';
+  b.onclick=function(){var g=data[k(sel)]||[];var i=g.indexOf(it[0]);if(i>-1)g.splice(i,1);else g.push(it[0]);data[k(sel)]=g;save();render()};
+  list.appendChild(b)})}
+ add(BASE);
+ if(sel.getDay()===5){var h=document.createElement("h2");h.textContent="Vendredi";list.appendChild(h);add(FRI)}
+ document.getElementById("count").textContent=got.length+" sur "+its.length;
+ document.getElementById("fill").style.width=Math.round(100*got.length/its.length)+"%";
+ document.getElementById("wk").textContent="Semaine : "+tenus+" jour"+(tenus>1?"s":"")+" tenu"+(tenus>1?"s":"")+" sur 7";
+}
+render();
+</script>
+</body>
+</html>
