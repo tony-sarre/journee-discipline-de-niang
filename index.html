@@ -33,6 +33,22 @@ h1{font:700 24px/1.2 Georgia,"Times New Roman",serif;color:var(--green);margin:0
 .item.on span:last-child{text-decoration:line-through;color:var(--mute)}
 h2{font:700 16px/1.2 Georgia,serif;color:var(--gold);margin:18px 2px 8px}
 .note{color:var(--mute);font-size:13px;margin-top:20px;border-top:1px solid var(--line);padding-top:12px}
+.nav{display:flex;align-items:center;justify-content:space-between;margin-bottom:8px}
+.nav button{border:1px solid var(--line);background:var(--card);color:var(--ink);border-radius:10px;width:44px;height:40px;font-size:20px;cursor:pointer}
+.nav button:disabled{opacity:.35;cursor:default}
+.nav span{font-size:14px;color:var(--mute)}
+.day:disabled{opacity:.4;cursor:default}
+.day.today{border-color:var(--gold)}
+.msg{background:var(--ok);border-left:4px solid var(--green);border-radius:10px;padding:11px 14px;margin:0 0 12px;font-size:15px}
+.msg.top{border-left-color:var(--gold)}
+.stats{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:10px}
+.stat{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:10px;text-align:center}
+.stat b{display:block;font:700 22px Georgia,serif;color:var(--green)}
+.stat span{font-size:12px;color:var(--mute)}
+.chart{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:10px 8px;margin-bottom:10px}
+.chart p{margin:0 4px 4px;font-size:13px;color:var(--mute)}
+svg{width:100%;height:auto;display:block}
+.bg{fill:var(--line)}.fg{fill:var(--green)}.hi{fill:var(--gold)}.tx{fill:var(--mute);font-size:9px}.ln{stroke:var(--gold);stroke-dasharray:3 3;stroke-width:1}
 @media (prefers-reduced-motion:reduce){.bar i{transition:none}}
 </style>
 </head>
@@ -40,12 +56,17 @@ h2{font:700 16px/1.2 Georgia,serif;color:var(--gold);margin:18px 2px 8px}
 <main>
 <h1>Ma journée disciplinée</h1>
 <p class="sub" id="date"></p>
+<div class="nav"><button id="prev" aria-label="Semaine précédente">‹</button><span id="wlabel"></span><button id="next" aria-label="Semaine suivante">›</button></div>
 <div class="week" id="week"></div>
+<div id="msg"></div>
 <div class="score"><strong id="count"></strong><span id="wk" class="sub" style="margin:0"></span></div>
 <div class="bar"><i id="fill"></i></div>
 <div id="list"></div>
-<p class="note">Un bloc raté ? On reprend au suivant, sans culpabilité. Objectif réaliste : 5 jours sur 7.<br><br>
-Pour l'installer sur l'iPhone : ouvrir ce lien dans Safari, appuyer sur Partager, puis « Sur l'écran d'accueil ».</p>
+<h2>Mon évolution</h2>
+<div class="stats"><div class="stat"><b id="s1">0</b><span>jours de suite</span></div><div class="stat"><b id="s2">0</b><span>meilleure série</span></div><div class="stat"><b id="s3">0%</b><span>moyenne 30 jours</span></div></div>
+<div class="chart"><p>30 derniers jours : % des tâches faites (trait doré : 80 %)</p><div id="c1"></div></div>
+<div class="chart"><p>8 dernières semaines : jours tenus sur 7</p><div id="c2"></div></div>
+<p class="note">Un jour est « tenu » quand au moins 80 % des tâches sont cochées. Objectif réaliste : 5 jours sur 7.</p>
 </main>
 <script>
 var BASE=[["wake","Réveil à 4h"],["fajr","Fajr + invocations du matin"],["sport","Sport (1h)"],["eng","Anglais (30 à 45 min)"],["fam","Dîner en famille, sans téléphone"],["rech","Recherche médicale"],["soc","Réseaux sociaux : limite respectée"],["bed","Coucher vers 21h30"]];
@@ -58,27 +79,66 @@ function k(d){return d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")+
 function items(d){return d.getDay()===5?BASE.concat(FRI):BASE}
 function done(d){return (data[k(d)]||[]).length}
 function ok(d){var n=items(d).length;return done(d)>=Math.ceil(n*0.8)}
-var today=new Date(),sel=new Date(today);
+var today=new Date();today.setHours(12,0,0,0);var sel=new Date(today),vm=monday(today);
 function monday(d){var m=new Date(d);m.setDate(m.getDate()-((m.getDay()+6)%7));return m}
+function add(d,n){var x=new Date(d);x.setDate(x.getDate()+n);return x}
+function pct(d){return Math.min(1,done(d)/items(d).length)}
+function fmt(d,o){return d.toLocaleDateString("fr-FR",o)}
+function future(d){return k(d)>k(today)}
+function msg(got,n,d){
+ var box=document.getElementById("msg");
+ if(future(d)||!got){box.innerHTML="";return}
+ var p=got/n,t,c="msg";
+ if(p>=1){t="Barakallahu fik ! Journée parfaite, toutes les tâches sont faites.";c+=" top"}
+ else if(p>=0.8){t="Bravo, journée tenue ! Continue sur cette lancée."}
+ else if(p>=0.5){t="Bon travail, tu y es presque : encore "+(Math.ceil(n*0.8)-got)+" case(s) pour tenir la journée."}
+ else{t="Un bon début. Un bloc raté ? On reprend au suivant, sans culpabilité."}
+ box.innerHTML='<p class="'+c+'">'+t+'</p>'}
+function streaks(){
+ var cur=0,best=0,run=0,keys=Object.keys(data).sort();
+ if(keys.length){var a=new Date(keys[0]+"T12:00:00");for(var d=a;k(d)<=k(today);d=add(d,1)){if(ok(d)){run++;if(run>best)best=run}else run=0}}
+ var d2=new Date(today);if(!ok(d2))d2=add(d2,-1);
+ while(ok(d2)){cur++;d2=add(d2,-1)}
+ return [cur,best]}
+function bars(arr,max,labels,line){
+ var w=320,h=110,n=arr.length,bw=w/n,o='<svg viewBox="0 0 '+w+' '+(h+14)+'" role="img" aria-label="graphique">';
+ arr.forEach(function(v,i){var bh=Math.max(2,Math.round(h*v/max));
+  o+='<rect class="'+(line&&v/max>=0.8?'fg':(line?'bg':'fg'))+'" x="'+(i*bw+1.5)+'" y="'+(h-bh)+'" width="'+(bw-3)+'" height="'+bh+'" rx="2"/>'});
+ if(line)o+='<line class="ln" x1="0" x2="'+w+'" y1="'+(h*0.2)+'" y2="'+(h*0.2)+'"/>';
+ o+='<text class="tx" x="0" y="'+(h+11)+'">'+labels[0]+'</text><text class="tx" x="'+w+'" y="'+(h+11)+'" text-anchor="end">'+labels[1]+'</text></svg>';
+ return o}
+function stats(){
+ var st=streaks();document.getElementById("s1").textContent=st[0];document.getElementById("s2").textContent=st[1];
+ var d30=[],sum=0;for(var i=29;i>=0;i--){var d=add(today,-i);var p=pct(d);d30.push(p);sum+=p}
+ document.getElementById("s3").textContent=Math.round(100*sum/30)+"%";
+ document.getElementById("c1").innerHTML=bars(d30,1,[fmt(add(today,-29),{day:"numeric",month:"short"}),"aujourd'hui"],true);
+ var w8=[],m=monday(today);for(var q=7;q>=0;q--){var ms=add(m,-7*q),c=0;for(var z=0;z<7;z++){var dd=add(ms,z);if(!future(dd)&&ok(dd))c++}w8.push(c)}
+ document.getElementById("c2").innerHTML=bars(w8,7,[fmt(add(m,-49),{day:"numeric",month:"short"}),"cette semaine"],false)}
 function render(){
- var m=monday(today),w=document.getElementById("week");w.innerHTML="";var tenus=0;
- for(var i=0;i<7;i++){var d=new Date(m);d.setDate(m.getDate()+i);if(ok(d))tenus++;
-  var b=document.createElement("button");b.className="day"+(k(d)===k(sel)?" sel":"")+(ok(d)?" done":"");
-  b.innerHTML=D[i]+"<b>"+d.getDate()+"</b>";b.setAttribute("aria-label",D[i]+" "+d.getDate());
+ var w=document.getElementById("week");w.innerHTML="";
+ document.getElementById("wlabel").textContent="Semaine du "+fmt(vm,{day:"numeric",month:"long"});
+ document.getElementById("next").disabled=k(vm)>=k(monday(today));
+ var tenus=0;
+ for(var i=0;i<7;i++){var d=add(vm,i);if(!future(d)&&ok(d))tenus++;
+  var b=document.createElement("button");b.className="day"+(k(d)===k(sel)?" sel":"")+(ok(d)?" done":"")+(k(d)===k(today)?" today":"");
+  b.disabled=future(d);b.innerHTML=D[i]+"<b>"+d.getDate()+"</b>";b.setAttribute("aria-label",D[i]+" "+d.getDate());
   (function(dd){b.onclick=function(){sel=dd;render()}})(d);w.appendChild(b)}
- document.getElementById("date").textContent=sel.toLocaleDateString("fr-FR",{weekday:"long",day:"numeric",month:"long"})+(sel.getDay()===5?" : le jour béni":"");
+ var tag=k(sel)===k(today)?"Aujourd'hui : ":(k(sel)===k(add(today,-1))?"Hier : ":"");
+ document.getElementById("date").textContent=tag+fmt(sel,{weekday:"long",day:"numeric",month:"long"})+(sel.getDay()===5?" : le jour béni":"");
  var list=document.getElementById("list");list.innerHTML="";var its=items(sel),got=data[k(sel)]||[];
- function add(arr){arr.forEach(function(it){var on=got.indexOf(it[0])>-1;
+ function addItems(arr){arr.forEach(function(it){var on=got.indexOf(it[0])>-1;
   var b=document.createElement("button");b.className="item"+(on?" on":"");b.setAttribute("aria-pressed",on);
   b.innerHTML='<span class="box">'+(on?"✓":"")+'</span><span>'+it[1]+'</span>';
-  b.onclick=function(){var g=data[k(sel)]||[];var i=g.indexOf(it[0]);if(i>-1)g.splice(i,1);else g.push(it[0]);data[k(sel)]=g;save();render()};
+  b.onclick=function(){var g=data[k(sel)]||[];var x=g.indexOf(it[0]);if(x>-1)g.splice(x,1);else g.push(it[0]);data[k(sel)]=g;save();render()};
   list.appendChild(b)})}
- add(BASE);
- if(sel.getDay()===5){var h=document.createElement("h2");h.textContent="Vendredi";list.appendChild(h);add(FRI)}
+ addItems(BASE);
+ if(sel.getDay()===5){var h=document.createElement("h2");h.textContent="Vendredi";list.appendChild(h);addItems(FRI)}
  document.getElementById("count").textContent=got.length+" sur "+its.length;
  document.getElementById("fill").style.width=Math.round(100*got.length/its.length)+"%";
  document.getElementById("wk").textContent="Semaine : "+tenus+" jour"+(tenus>1?"s":"")+" tenu"+(tenus>1?"s":"")+" sur 7";
-}
+ msg(got.length,its.length,sel);stats()}
+document.getElementById("prev").onclick=function(){vm=add(vm,-7);sel=new Date(vm);render()};
+document.getElementById("next").onclick=function(){vm=add(vm,7);sel=k(vm)===k(monday(today))?new Date(today):new Date(vm);render()};
 render();
 </script>
 </body>
